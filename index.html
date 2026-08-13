@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JSON Structure Generator</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+  p.sub {
+    color: #94a3b8;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .container {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .panel {
+    flex: 1;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+  }
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #cbd5e1;
+  }
+  textarea {
+    width: 100%;
+    height: 420px;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: "Fira Code", Consolas, Menlo, monospace;
+    font-size: 13px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  textarea:focus { outline: 2px solid #6366f1; }
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  button {
+    background: #6366f1;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #4f46e5; }
+  button.secondary {
+    background: #334155;
+  }
+  button.secondary:hover { background: #475569; }
+  .mode-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #cbd5e1;
+  }
+  select {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .error {
+    color: #f87171;
+    font-size: 13px;
+    margin-top: 8px;
+    min-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<h1>JSON Structure Generator</h1>
+<p class="sub">Paste a JSON payload. It generates the same structure with keys kept, but values removed / replaced by type placeholders.</p>
+
+<div class="controls">
+  <button id="generateBtn">Generate</button>
+  <button id="copyBtn" class="secondary">Copy Output</button>
+  <button id="clearBtn" class="secondary">Clear</button>
+  <div class="mode-select">
+    <label for="modeSelect" style="margin:0;">Mode:</label>
+    <select id="modeSelect">
+      <option value="empty">Empty values ("")</option>
+      <option value="type" selected>Type placeholders (string/number/boolean)</option>
+      <option value="null">null values</option>
+    </select>
+  </div>
+</div>
+
+<div class="container">
+  <div class="panel">
+    <label for="input">Input JSON</label>
+    <textarea id="input" placeholder='{
+  "world": {
+    "country": "india",
+    "isD": true,
+    "is": 0,
+    "date": "12334",
+    "d": "adf"
+  }
+}'></textarea>
+  </div>
+  <div class="panel">
+    <label for="output">Generated Structure (no values)</label>
+    <textarea id="output" readonly placeholder="Output will appear here..."></textarea>
+  </div>
+</div>
+
+<div class="error" id="errorMsg"></div>
+
+<script>
+const inputEl = document.getElementById('input');
+const outputEl = document.getElementById('output');
+const errorEl = document.getElementById('errorMsg');
+const modeSelect = document.getElementById('modeSelect');
+
+function stripValues(node, mode) {
+  if (Array.isArray(node)) {
+    if (node.length === 0) return [];
+    // Keep structure of first element as representative, wrapped in array
+    return [stripValues(node[0], mode)];
+  } else if (node !== null && typeof node === 'object') {
+    const result = {};
+    for (const key of Object.keys(node)) {
+      result[key] = stripValues(node[key], mode);
+    }
+    return result;
+  } else {
+    // primitive value
+    switch (mode) {
+      case 'empty':
+        if (typeof node === 'string') return "";
+        if (typeof node === 'number') return 0;
+        if (typeof node === 'boolean') return false;
+        return null;
+      case 'null':
+        return null;
+      case 'type':
+      default:
+        if (typeof node === 'string') return "string";
+        if (typeof node === 'number') return "number";
+        if (typeof node === 'boolean') return "boolean";
+        if (node === null) return "null";
+        return typeof node;
+    }
+  }
+}
+
+function generate() {
+  errorEl.textContent = "";
+  const raw = inputEl.value.trim();
+  if (!raw) {
+    errorEl.textContent = "Please paste a JSON payload first.";
+    outputEl.value = "";
+    return;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    errorEl.textContent = "Invalid JSON: " + e.message;
+    outputEl.value = "";
+    return;
+  }
+  const mode = modeSelect.value;
+  const structured = stripValues(parsed, mode);
+  outputEl.value = JSON.stringify(structured, null, 2);
+}
+
+document.getElementById('generateBtn').addEventListener('click', generate);
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  if (!outputEl.value) return;
+  navigator.clipboard.writeText(outputEl.value).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => btn.textContent = original, 1200);
+  });
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  inputEl.value = "";
+  outputEl.value = "";
+  errorEl.textContent = "";
+});
+
+modeSelect.addEventListener('change', () => {
+  if (inputEl.value.trim()) generate();
+});
+</script>
+
+</body>
+</html>
